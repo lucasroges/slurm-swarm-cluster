@@ -1,0 +1,29 @@
+version: '3.4'
+
+services:
+  controller:
+    image: slurm-swarm-controller:19.05.4
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - slurmnet
+    depends_on:
+      - worker
+#    command: "/usr/sbin/sshd -D"
+
+  worker:
+    image: slurm-swarm-worker:19.05.4
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+    networks:
+      - slurmnet
+#    command: "/usr/sbin/sshd -D"
+
+networks:
+  slurmnet:
+    driver: overlay
+    attachable: true

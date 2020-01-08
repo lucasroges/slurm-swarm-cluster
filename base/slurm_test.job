@@ -1,0 +1,8 @@
+#!/bin/bash
+
+#SBATCH --job-name=SLURM_TEST
+#SBATCH --output=SLURM_TEST.out
+#SBATCH --error=SLURM_TEST.err
+#SBATCH --partition=swarm-partition
+
+srun hostname | sort
