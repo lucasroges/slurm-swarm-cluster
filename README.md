@@ -58,3 +58,17 @@ Alguns comandos podem ser executados para verificar a estrutura do *cluster* e o
 Um pequeno exemplo ([slurm_test.job](base/slurm_test.job)) foi colocado na imagem para realizar um simples teste nos nós de processamento.
 
 Para execução do mesmo, utilizar o comando `sbatch -N <número-de-nós> slurm_test.job`.
+
+### Exemplo MPI
+
+Outro exemplo a ser executado, dessa vez utilizando MPI, está disponível no repositório em [mpi_hello.c](base/mpi_hello.c).
+
+Para instalação do MPI no CentOS, executar o comando abaixo dentro dos *containers*.
+
+```
+yum install openmpi-devel
+```
+
+O compilador `mpicc` e outros estarão disponíveis em `/usr/lib64/openmpi/bin`. A aplicação é compilada executando-se `/usr/lib64/openmpi/bin/mpicc mpi_hello.c -o mpi_hello`. Sua execução se dá através de ` srun -N <número-de-nós> --mpi=openmpi mpi_hello`.
+
+Lembrando que o MPI deve ser instalado em todos os *containers worker* (nós de processamento), assim como o arquivo executável deve estar disponível em todos esses.
