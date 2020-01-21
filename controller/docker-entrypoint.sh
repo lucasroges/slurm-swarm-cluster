@@ -1,5 +1,14 @@
 #!/bin/sh
 
+SLURM_ACCT_DB_SQL=/slurm_acct_db.sql
+STORAGE_HOST=`hostname`
+STORAGE_USER=slurm
+STORAGE_PASS=password
+STORAGE_PORT=3306
+DBD_ADDR=`hostname`
+DBD_HOST=`hostname`
+DBD_PORT=6819
+
 _munge_config() {
         chown -R munge: /etc/munge /var/lib/munge /var/log/munge /var/run/munge
         chmod 0700 /etc/munge
@@ -21,6 +30,7 @@ _wait_for_workers() {
                         echo -n "."
                 done
         done
+	sleep 5s
 }
 
 _create_slurmconf() {
@@ -129,6 +139,84 @@ _configure_workers() {
 	done
 }
 
+_slurm_acct_db() {
+	{
+	    echo "create database slurm_acct_db;"
+	    echo "create user '${STORAGE_USER}'@'${STORAGE_HOST}';"
+	    echo "set password for '${STORAGE_USER}'@'${STORAGE_HOST}' = password('${STORAGE_PASS}');"
+	    echo "grant usage on *.* to '${STORAGE_USER}'@'${STORAGE_HOST}';"
+	    echo "grant all privileges on slurm_acct_db.* to '${STORAGE_USER}'@'${STORAGE_HOST}';"
+	    echo "flush privileges;"
+	} >> $SLURM_ACCT_DB_SQL
+}
+
+_configure_db() {
+	ln -s /usr/bin/resolveip /usr/libexec/resolveip
+	mysql_install_db
+	chown -R mysql: /var/lib/mysql/ /var/log/mariadb/ /var/run/mariadb
+	cd /var/lib/mysql
+	mysqld_safe --user=mysql &
+	cd /
+	_slurm_acct_db
+	sleep 5s
+	mysql -uroot < $SLURM_ACCT_DB_SQL
+}
+
+_create_slurmdbdconf() {
+	HOSTNAME=`hostname`
+
+	cat <<EOM >/etc/slurm/slurmdbd.conf
+#
+# Example slurmdbd.conf file.
+#
+# See the slurmdbd.conf man page for more information.
+#
+# Archive info
+#ArchiveJobs=yes
+#ArchiveDir="/tmp"
+#ArchiveSteps=yes
+#ArchiveScript=
+#JobPurge=12
+#StepPurge=1
+#
+# Authentication info
+AuthType=auth/munge
+#AuthInfo=/var/run/munge/munge.socket.2
+#
+# slurmDBD info
+DbdAddr=`hostname`
+DbdHost=`hostname`
+DbdPort=6819
+SlurmUser=slurm
+#MessageTimeout=300
+DebugLevel=verbose
+#DefaultQOS=normal,standby
+LogFile=/var/log/slurm/slurmdbd.log
+PidFile=/var/run/slurmdbd.pid
+#PluginDir=/usr/lib/slurm
+#PrivateData=accounts,users,usage,jobs
+#TrackWCKey=yes
+#
+# Database info
+StorageType=accounting_storage/mysql
+StorageHost=`hostname`
+StoragePort=3306
+StoragePass=password
+StorageUser=slurm
+StorageLoc=slurm_acct_db
+EOM
+
+	cp /etc/slurm/slurmdbd.conf /usr/local/etc/slurmdbd.conf
+}
+
+_slurmdbd() {
+	mkdir -p /var/spool/slurm/d \
+    	/var/log/slurm
+	chown slurm: /var/spool/slurm/d \
+    	/var/log/slurm
+    /usr/sbin/slurmdbd
+}
+
 # main
 /usr/sbin/sshd
 _munge_config
@@ -137,5 +225,10 @@ _create_slurmconf
 _send_to_workers
 _slurmctld
 _configure_workers
+
+#db
+_configure_db
+_create_slurmdbdconf
+_slurmdbd
 
 tail -f /dev/null

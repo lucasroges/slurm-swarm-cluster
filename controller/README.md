@@ -2,6 +2,8 @@
 
 Imagem contendo um *script* de execução que configura arquivos e dirétórios do Munge e do SLURM, no nó controlador e nos nós de processamento, para possibilitar o funcionamento do SLURM em todos esses nós.
 
+Além disso, configura o banco de dados para executar no próprio nó controlador.
+
 ## Obtenção
 
 Para construir essa imagem, utilizar o comando abaixo.
