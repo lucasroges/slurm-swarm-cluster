@@ -64,7 +64,7 @@ Waittime=0
 SchedulerType=sched/backfill
 SelectType=select/linear
 FastSchedule=1
-AccountingStorageType=accounting_storage/none
+AccountingStorageType=accounting_storage/slurmdbd
 # JobAcctGatherFrequency=30
 JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=3
@@ -114,7 +114,7 @@ _slurmctld() {
 	chown slurm: /var/log/slurm_jobacct.log
 	chown slurm: /var/log/slurm_jobcomp.log
 	chown -R slurm: /var/spool/
-	slurmctld
+	/usr/sbin/slurmctld
 }
 
 _configure_workers() {
@@ -135,7 +135,7 @@ _configure_workers() {
 			&& chmod 755 /var/spool/slurmd \
 			&& touch /var/log/slurmd.log \
 			&& chown slurm: /var/log/slurmd.log \
-			&& slurmd" 
+			&& /usr/sbin/slurmd" 
 	done
 }
 
@@ -210,12 +210,29 @@ EOM
 }
 
 _slurmdbd() {
-	mkdir -p /var/spool/slurm/d \
-    	/var/log/slurm
-	chown slurm: /var/spool/slurm/d \
-    	/var/log/slurm
-    /usr/sbin/slurmdbd
+	mkdir -p /var/spool/slurm/d /var/log/slurm
+	chown slurm: /var/spool/slurm/d /var/log/slurm
+    	/usr/sbin/slurmdbd
 }
+
+_add_cluster_sacctmgr() {
+	TRIES=5
+	echo -n "Trying to add cluster to sacct"
+	while ! /usr/bin/sacctmgr -i add cluster swarm-cluster; do
+		echo -n "."
+		TRIES=$(( ${TRIES}-1 ))
+	        if [ ${TRIES} -le 0 ]; then
+        	     echo_error "Timeout waiting initialization slurm accounting."
+		fi
+		sleep 5s
+	done
+	/usr/sbin/slurmctld
+}
+
+# db
+_configure_db
+_create_slurmdbdconf
+_slurmdbd
 
 # main
 /usr/sbin/sshd
@@ -225,10 +242,6 @@ _create_slurmconf
 _send_to_workers
 _slurmctld
 _configure_workers
-
-#db
-_configure_db
-_create_slurmdbdconf
-_slurmdbd
+_add_cluster_sacctmgr
 
 tail -f /dev/null
